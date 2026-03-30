@@ -142,8 +142,12 @@ async function main() {
     });
   }
 
-  // Create a sample timecard for Josh
-  const timecard = await prisma.timecard.create({
+  // Create a sample timecard for Josh (skip if one already exists)
+  const existingTimecard = await prisma.timecard.findFirst({
+    where: { contractorId: josh.id, productionId: production.id, weekEnding: new Date("2026-03-28") },
+  });
+
+  const timecard = existingTimecard ?? await prisma.timecard.create({
     data: {
       contractorId: josh.id,
       productionId: production.id,
