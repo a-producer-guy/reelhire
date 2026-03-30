@@ -9,25 +9,14 @@ import {
 } from "@/lib/utils";
 import { PAY_TYPES, STATUS_LABELS, STATUS_COLORS, PAYMENT_TERMS_LABELS } from "@/types";
 import { Save, Send, ArrowLeft, Plus, X } from "lucide-react";
+import { SceneSearch } from "@/components/timecards/scene-search";
 import Link from "next/link";
-
-// Demo scene codes for the production
-const AVAILABLE_SCENES = [
-  { id: "sc-1", code: "SC-098", description: "Ext. Parking Lot - Night" },
-  { id: "sc-2", code: "SC-099", description: "Int. Hallway - Day" },
-  { id: "sc-3", code: "SC-100", description: "Int. Office - Day - Dialog" },
-  { id: "sc-4", code: "SC-101", description: "Int. Office - Day - Action" },
-  { id: "sc-5", code: "SC-102", description: "Ext. Rooftop - Sunset" },
-  { id: "sc-6", code: "SC-103", description: "Int. Warehouse - Night" },
-  { id: "sc-7", code: "SC-104", description: "Ext. Street - Day - Chase" },
-  { id: "sc-8", code: "SC-115", description: "Int. Kitchen - Morning" },
-  { id: "sc-9", code: "SC-116", description: "Int. Bedroom - Night" },
-  { id: "sc-10", code: "SC-120", description: "Ext. Beach - Golden Hour" },
-];
+import type { AirtableScene } from "@/lib/airtable";
 
 type SceneEntry = {
   sceneId: string;
   sceneCode: string;
+  actorName: string;
   hours: number;
   notes: string;
 };
@@ -88,22 +77,7 @@ export default function ContractorTimecardPage() {
       ot15: [1, 2, 3, 4].includes(i) ? 0 : 0,
       ot2: 0,
       totalHours: [1, 2, 3, 4].includes(i) ? 8 : 0,
-      scenes: [1, 2, 3, 4].includes(i)
-        ? [
-            {
-              sceneId: AVAILABLE_SCENES[i].id,
-              sceneCode: AVAILABLE_SCENES[i].code,
-              hours: 5,
-              notes: "",
-            },
-            {
-              sceneId: AVAILABLE_SCENES[i + 1].id,
-              sceneCode: AVAILABLE_SCENES[i + 1].code,
-              hours: 3,
-              notes: "",
-            },
-          ]
-        : [],
+      scenes: [],
     }))
   );
 
@@ -138,17 +112,20 @@ export default function ContractorTimecardPage() {
     });
   };
 
-  const addScene = (dayIndex: number, sceneId: string) => {
-    const scene = AVAILABLE_SCENES.find((s) => s.id === sceneId);
-    if (!scene) return;
-
+  const addSceneFromAirtable = (dayIndex: number, scene: AirtableScene) => {
     setEntries((prev) => {
       const updated = [...prev];
       const entry = { ...updated[dayIndex] };
-      if (entry.scenes.some((s) => s.sceneId === sceneId)) return prev;
+      if (entry.scenes.some((s) => s.sceneId === scene.airtableId)) return prev;
       entry.scenes = [
         ...entry.scenes,
-        { sceneId, sceneCode: scene.code, hours: 0, notes: "" },
+        {
+          sceneId: scene.airtableId,
+          sceneCode: scene.sceneCode,
+          actorName: scene.actorName,
+          hours: 0,
+          notes: "",
+        },
       ];
       updated[dayIndex] = entry;
       return updated;
@@ -187,12 +164,17 @@ export default function ContractorTimecardPage() {
   const totalOT = entries.reduce((s, e) => s + e.ot15 + e.ot2, 0);
   const totalPay = totalST * hourlyRate + totalOT * hourlyRate * 1.5;
 
-  // Gather all scene codes used
+  // Gather all scene codes used with actor names
   const allSceneCodes = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { hours: number; actorName: string }>();
     entries.forEach((e) => {
       e.scenes.forEach((s) => {
-        map.set(s.sceneCode, (map.get(s.sceneCode) || 0) + s.hours);
+        const existing = map.get(s.sceneCode);
+        if (existing) {
+          existing.hours += s.hours;
+        } else {
+          map.set(s.sceneCode, { hours: s.hours, actorName: s.actorName || "" });
+        }
       });
     });
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -323,25 +305,11 @@ export default function ContractorTimecardPage() {
                         Add Scene
                       </Button>
                       {showScenePickerFor === dayIdx && (
-                        <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-48 overflow-auto">
-                          {AVAILABLE_SCENES.filter(
-                            (s) =>
-                              !entry.scenes.some((es) => es.sceneId === s.id)
-                          ).map((scene) => (
-                            <button
-                              key={scene.id}
-                              onClick={() => addScene(dayIdx, scene.id)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-violet-50 flex items-center gap-2"
-                            >
-                              <span className="font-mono font-medium text-violet-600">
-                                {scene.code}
-                              </span>
-                              <span className="text-slate-500 truncate">
-                                {scene.description}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
+                        <SceneSearch
+                          excludeIds={entry.scenes.map((s) => s.sceneId)}
+                          onSelect={(scene) => addSceneFromAirtable(dayIdx, scene)}
+                          onClose={() => setShowScenePickerFor(null)}
+                        />
                       )}
                     </div>
                   </div>
@@ -353,15 +321,16 @@ export default function ContractorTimecardPage() {
                           key={scene.sceneId}
                           className="flex items-center gap-3 bg-violet-50 border border-violet-200 rounded-lg px-3 py-2"
                         >
-                          <span className="font-mono text-sm font-semibold text-violet-700 w-16">
+                          <span className="font-mono text-sm font-semibold text-violet-700 shrink-0">
                             {scene.sceneCode}
                           </span>
-                          <span className="text-xs text-slate-500 flex-1">
-                            {
-                              AVAILABLE_SCENES.find(
-                                (s) => s.id === scene.sceneId
-                              )?.description
-                            }
+                          {scene.actorName && (
+                            <span className="text-xs font-medium text-slate-700 shrink-0">
+                              {scene.actorName}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-400 flex-1 truncate">
+                            &middot;
                           </span>
                           <div className="flex items-center gap-1.5">
                             <input
@@ -464,23 +433,25 @@ export default function ContractorTimecardPage() {
           </h3>
           {allSceneCodes.length > 0 ? (
             <div className="space-y-2">
-              {allSceneCodes.map(([code, hours]) => (
+              {allSceneCodes.map(([code, data]) => (
                 <div key={code} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-violet-700 bg-violet-100 px-2 py-0.5 rounded">
                       {code}
                     </span>
-                    <span className="text-xs text-slate-500">
-                      {AVAILABLE_SCENES.find((s) => s.code === code)?.description}
-                    </span>
+                    {data.actorName && (
+                      <span className="text-xs font-medium text-slate-700">
+                        {data.actorName}
+                      </span>
+                    )}
                   </div>
-                  <span className="font-mono text-sm">{hours.toFixed(1)}h</span>
+                  <span className="font-mono text-sm">{data.hours.toFixed(1)}h</span>
                 </div>
               ))}
               <div className="flex justify-between border-t pt-2 font-semibold text-sm">
                 <span>Total Allocated</span>
                 <span className="font-mono">
-                  {allSceneCodes.reduce((s, [, h]) => s + h, 0).toFixed(1)}h
+                  {allSceneCodes.reduce((s, [, d]) => s + d.hours, 0).toFixed(1)}h
                 </span>
               </div>
             </div>
