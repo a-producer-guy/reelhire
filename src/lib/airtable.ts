@@ -5,6 +5,16 @@ const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_SCENES_TABLE_ID = process.env.AIRTABLE_SCENES_TABLE_ID;
 const AIRTABLE_SCENES_VIEW_ID = process.env.AIRTABLE_SCENES_VIEW_ID;
+const AIRTABLE_NYC_VIEW_ID = process.env.AIRTABLE_NYC_VIEW_ID;
+const AIRTABLE_LA_VIEW_ID = process.env.AIRTABLE_LA_VIEW_ID;
+
+export type StudioLocation = "all" | "nyc" | "la";
+
+const VIEW_IDS: Record<StudioLocation, string | undefined> = {
+  all: AIRTABLE_SCENES_VIEW_ID,
+  nyc: AIRTABLE_NYC_VIEW_ID,
+  la: AIRTABLE_LA_VIEW_ID,
+};
 
 const AIRTABLE_API_URL = "https://api.airtable.com/v0";
 
@@ -110,6 +120,7 @@ export async function fetchScenesFromAirtable(options?: {
   search?: string;
   maxRecords?: number;
   offset?: string;
+  location?: StudioLocation;
 }): Promise<{ scenes: AirtableScene[]; offset?: string; fieldNames: string[] }> {
   if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_SCENES_TABLE_ID) {
     throw new Error("Airtable credentials not configured");
@@ -118,7 +129,8 @@ export async function fetchScenesFromAirtable(options?: {
   const params = new URLSearchParams();
   if (options?.maxRecords) params.set("maxRecords", String(options.maxRecords));
   if (options?.offset) params.set("offset", options.offset);
-  if (AIRTABLE_SCENES_VIEW_ID) params.set("view", AIRTABLE_SCENES_VIEW_ID);
+  const viewId = VIEW_IDS[options?.location || "all"] || AIRTABLE_SCENES_VIEW_ID;
+  if (viewId) params.set("view", viewId);
 
   // Add search filter if provided (searches across scene code and actor name fields)
   if (options?.search) {

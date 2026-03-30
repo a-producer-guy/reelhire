@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, Loader2 } from "lucide-react";
-import type { AirtableScene } from "@/lib/airtable";
+import { Search, X, Loader2, MapPin } from "lucide-react";
+import type { AirtableScene, StudioLocation } from "@/lib/airtable";
 
 interface SceneSearchProps {
   onSelect: (scene: AirtableScene) => void;
@@ -10,8 +10,15 @@ interface SceneSearchProps {
   onClose: () => void;
 }
 
+const LOCATIONS: { value: StudioLocation; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "nyc", label: "NYC" },
+  { value: "la", label: "LA" },
+];
+
 export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchProps) {
   const [query, setQuery] = useState("");
+  const [location, setLocation] = useState<StudioLocation>("all");
   const [scenes, setScenes] = useState<AirtableScene[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,17 +28,18 @@ export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchP
 
   // Initial load
   useEffect(() => {
-    fetchScenes("");
+    fetchScenes("", location);
     inputRef.current?.focus();
   }, []);
 
-  const fetchScenes = useCallback(async (searchTerm: string) => {
+  const fetchScenes = useCallback(async (searchTerm: string, loc: StudioLocation) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
       params.set("maxRecords", "50");
+      params.set("location", loc);
 
       const res = await fetch(`/api/airtable/scenes?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -50,7 +58,12 @@ export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchP
   const handleSearch = (value: string) => {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchScenes(value), 300);
+    debounceRef.current = setTimeout(() => fetchScenes(value, location), 300);
+  };
+
+  const handleLocationChange = (loc: StudioLocation) => {
+    setLocation(loc);
+    fetchScenes(query, loc);
   };
 
   const filteredScenes = scenes.filter((s) => !excludeIds.includes(s.airtableId));
@@ -83,7 +96,7 @@ export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchP
             <button
               onClick={() => {
                 setQuery("");
-                fetchScenes("");
+                fetchScenes("", location);
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
@@ -91,16 +104,36 @@ export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchP
             </button>
           )}
         </div>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-slate-500">
-            {loading ? "Searching..." : `${displayScenes.length} scenes found`}
-          </p>
-          <button
-            onClick={onClose}
-            className="text-xs text-slate-500 hover:text-slate-700"
-          >
-            Close
-          </button>
+
+        {/* Location tabs */}
+        <div className="flex items-center gap-1 mt-2">
+          <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <div className="flex gap-1">
+            {LOCATIONS.map((loc) => (
+              <button
+                key={loc.value}
+                onClick={() => handleLocationChange(loc.value)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                  location === loc.value
+                    ? "bg-violet-600 text-white"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                {loc.label}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <p className="text-xs text-slate-500">
+              {loading ? "Searching..." : `${displayScenes.length} scenes`}
+            </p>
+            <button
+              onClick={onClose}
+              className="text-xs text-slate-500 hover:text-slate-700"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
 
@@ -127,6 +160,14 @@ export function SceneSearch({ onSelect, excludeIds = [], onClose }: SceneSearchP
             <p className="text-sm text-slate-500">
               {query ? `No scenes matching "${query}"` : "No scenes available"}
             </p>
+            {location !== "all" && (
+              <button
+                onClick={() => handleLocationChange("all")}
+                className="text-xs text-violet-600 hover:text-violet-800 mt-1"
+              >
+                Search all locations
+              </button>
+            )}
           </div>
         ) : (
           displayScenes.map((scene) => (
