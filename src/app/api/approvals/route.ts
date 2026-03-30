@@ -6,18 +6,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { timecardId, reviewerId, action, comment } = body;
 
-  // Create the review record
   const review = await prisma.timecardReview.create({
     data: {
       timecardId,
       reviewerId,
       action,
       comment,
-      tier: body.tier || 1,
     },
   });
 
-  // Update the timecard status based on the action
   let newStatus: TimecardStatus;
   switch (action) {
     case "APPROVED":
@@ -26,7 +23,7 @@ export async function POST(request: NextRequest) {
     case "BYPASS_TO_FINAL":
       newStatus = TimecardStatus.SUBMITTED_TO_PAYROLL;
       break;
-    case "RETURNED_TO_EMPLOYEE":
+    case "RETURNED_TO_CONTRACTOR":
       newStatus = TimecardStatus.RETURNED;
       break;
     case "REVIEWED":
@@ -37,9 +34,28 @@ export async function POST(request: NextRequest) {
       newStatus = TimecardStatus.UNDER_REVIEW;
   }
 
+  // Calculate payment due date on approval
+  const updateData: Record<string, unknown> = { status: newStatus };
+  if (newStatus === TimecardStatus.APPROVED) {
+    const timecard = await prisma.timecard.findUnique({
+      where: { id: timecardId },
+    });
+    if (timecard) {
+      const daysMap: Record<string, number> = {
+        NET_30: 30,
+        NET_45: 45,
+        NET_60: 60,
+      };
+      const days = daysMap[timecard.paymentTerms] || 30;
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + days);
+      updateData.paymentDueDate = dueDate;
+    }
+  }
+
   await prisma.timecard.update({
     where: { id: timecardId },
-    data: { status: newStatus },
+    data: updateData,
   });
 
   return NextResponse.json(review, { status: 201 });

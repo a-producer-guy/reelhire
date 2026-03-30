@@ -6,30 +6,38 @@ export async function GET(request: NextRequest) {
   const productionId = searchParams.get("productionId");
   const status = searchParams.get("status");
   const weekEnding = searchParams.get("weekEnding");
+  const contractorId = searchParams.get("contractorId");
 
   const where: Record<string, unknown> = {};
   if (productionId) where.productionId = productionId;
   if (status) where.status = status;
   if (weekEnding) where.weekEnding = new Date(weekEnding);
+  if (contractorId) where.contractorId = contractorId;
 
   const timecards = await prisma.timecard.findMany({
     where,
     include: {
-      employee: {
+      contractor: {
         select: {
           id: true,
           name: true,
           email: true,
           role: true,
           jobTitle: true,
-          unionLocal: true,
           department: true,
         },
       },
       production: {
         select: { id: true, name: true, code: true },
       },
-      entries: { orderBy: { date: "asc" } },
+      entries: {
+        orderBy: { date: "asc" },
+        include: {
+          scenes: {
+            include: { scene: true },
+          },
+        },
+      },
       allowances: true,
       reviews: {
         include: {
@@ -49,19 +57,15 @@ export async function POST(request: NextRequest) {
 
   const timecard = await prisma.timecard.create({
     data: {
-      employeeId: body.employeeId,
+      contractorId: body.contractorId,
       productionId: body.productionId,
       weekEnding: new Date(body.weekEnding),
-      workLocation: body.workLocation,
-      studio: body.studio,
+      workLocation: body.workLocation || "Studio",
       jobTitle: body.jobTitle,
-      unionLocal: body.unionLocal,
       department: body.department,
-      accountCode: body.accountCode,
-      weeklyRate: body.weeklyRate,
       hourlyRate: body.hourlyRate,
-      guaranteedHours: body.guaranteedHours,
-      payType: body.payType,
+      dayRate: body.dayRate,
+      paymentTerms: body.paymentTerms || "NET_30",
       entries: {
         create: body.entries || [],
       },
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
       },
     },
     include: {
-      employee: true,
+      contractor: true,
       production: true,
       entries: true,
       allowances: true,

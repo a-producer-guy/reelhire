@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   LogOut,
+  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -19,8 +20,9 @@ import { useState } from "react";
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Timecards", href: "/timecards", icon: Clock },
+  { name: "Scene Codes", href: "/scenes", icon: Clapperboard },
   { name: "Productions", href: "/productions", icon: Film },
-  { name: "Crew", href: "/crew", icon: Users },
+  { name: "Contractors", href: "/crew", icon: Users },
   { name: "Payroll", href: "/payroll", icon: DollarSign },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

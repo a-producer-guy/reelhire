@@ -14,32 +14,26 @@ interface ReviewModalProps {
 const REVIEW_OPTIONS = [
   {
     value: "REVIEWED",
-    label: "Reviewed",
-    description:
-      'Mark as reviewed. Keeps timecard in your "To Approve" page.',
+    label: "Mark as Reviewed",
+    description: "Flag as reviewed but keep in queue for further action.",
   },
   {
     value: "APPROVED",
-    label: "Reviewed and Approved",
+    label: "Approve Timecard",
     description:
-      "Mark as reviewed and approved, sends to the next approver tier.",
+      "Approve the timecard. Payment due date will be calculated based on payment terms.",
   },
   {
     value: "BYPASS_TO_FINAL",
-    label: "Reviewed and Bypass to Final Approval",
+    label: "Approve & Send to Payroll",
     description:
-      "Mark as reviewed and approved, and timecard is ready for submission to payroll.",
+      "Approve and immediately send to payroll for processing.",
   },
   {
-    value: "TO_REVIEW",
-    label: "To Review",
+    value: "RETURNED_TO_CONTRACTOR",
+    label: "Return to Contractor",
     description:
-      'Flag for review. Keeps timecard in your "To Approve" page.',
-  },
-  {
-    value: "RETURNED_TO_EMPLOYEE",
-    label: "Return to Employee",
-    description: "Send back to the employee to fix the timecard.",
+      "Send back to the contractor to fix issues (missing scene codes, incorrect hours, etc.).",
   },
 ];
 
@@ -66,7 +60,7 @@ export function TimecardReviewModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Timecard Review">
+    <Modal open={open} onClose={onClose} title="Review Timecard">
       <div className="space-y-4">
         {REVIEW_OPTIONS.map((option) => (
           <label
@@ -94,14 +88,14 @@ export function TimecardReviewModal({
 
         <div className="pt-2">
           <label className="block text-sm font-medium text-slate-700 mb-1.5">
-            Add an Optional Review Comment
+            Comment (optional)
           </label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            rows={4}
+            rows={3}
             className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 resize-none"
-            placeholder="Add an optional review comment. No other person will see this review."
+            placeholder="Add a note about this review..."
           />
         </div>
 
@@ -110,7 +104,7 @@ export function TimecardReviewModal({
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Saving..." : "Save Review"}
+            {submitting ? "Saving..." : "Submit Review"}
           </Button>
         </div>
       </div>

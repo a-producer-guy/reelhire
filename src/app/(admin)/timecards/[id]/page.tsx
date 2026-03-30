@@ -78,9 +78,9 @@ function getWeekDays(weekEnding: string): { date: string; label: string }[] {
 const INITIAL_ALLOWANCES: AllowanceEntry[] = ALLOWANCE_TYPES.map((type, i) => ({
   id: `allow-${i}`,
   type,
-  rate: type === "Kit/Box Rental NT" ? "20.00/D" : "N/A",
-  daysWorked: type === "Kit/Box Rental NT" ? "3" : "0",
-  amount: type === "Kit/Box Rental NT" ? "60" : "0",
+  rate: type === "Kit Rental" ? "20.00/D" : "N/A",
+  daysWorked: type === "Kit Rental" ? "3" : "0",
+  amount: type === "Kit Rental" ? "60" : "0",
   accountCode: "",
   ff1: "",
   ff2: "",

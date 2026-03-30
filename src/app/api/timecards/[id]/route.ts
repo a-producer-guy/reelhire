@@ -10,19 +10,25 @@ export async function GET(
   const timecard = await prisma.timecard.findUnique({
     where: { id },
     include: {
-      employee: {
+      contractor: {
         select: {
           id: true,
           name: true,
           email: true,
           role: true,
           jobTitle: true,
-          unionLocal: true,
           department: true,
         },
       },
       production: { select: { id: true, name: true, code: true } },
-      entries: { orderBy: { date: "asc" } },
+      entries: {
+        orderBy: { date: "asc" },
+        include: {
+          scenes: {
+            include: { scene: true },
+          },
+        },
+      },
       allowances: true,
       reviews: {
         include: {
@@ -47,39 +53,22 @@ export async function PUT(
   const { id } = await params;
   const body = await request.json();
 
-  // Update timecard and recalculate totals
   const timecard = await prisma.timecard.update({
     where: { id },
     data: {
       status: body.status,
       workLocation: body.workLocation,
-      studio: body.studio,
-      accountCode: body.accountCode,
+      totalHours: body.totalHours,
       totalStraight: body.totalStraight,
       totalOT15: body.totalOT15,
       totalOT2: body.totalOT2,
-      totalForced: body.totalForced,
       totalAllowances: body.totalAllowances,
-      totalPenalties: body.totalPenalties,
       totalPay: body.totalPay,
-      dailyComments: body.dailyComments,
-      employeeComments: body.employeeComments,
-      employerComments: body.employerComments,
-      payrollComments: body.payrollComments,
+      contractorNotes: body.contractorNotes,
+      adminNotes: body.adminNotes,
+      payrollNotes: body.payrollNotes,
     },
   });
-
-  // Update entries if provided
-  if (body.entries) {
-    for (const entry of body.entries) {
-      if (entry.id) {
-        await prisma.timecardEntry.update({
-          where: { id: entry.id },
-          data: entry,
-        });
-      }
-    }
-  }
 
   return NextResponse.json(timecard);
 }
@@ -89,8 +78,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-
   await prisma.timecard.delete({ where: { id } });
-
   return NextResponse.json({ success: true });
 }

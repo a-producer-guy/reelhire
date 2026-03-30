@@ -3,65 +3,73 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create users
+  // Create admin user (Guy @ Reelarc)
   const admin = await prisma.user.upsert({
     where: { email: "guy@reelarc.com" },
     update: {},
     create: {
       email: "guy@reelarc.com",
-      name: "Guy",
+      name: "Guy Chachkes",
       role: "ADMIN",
       jobTitle: "Producer",
+      paymentTerms: "NET_30",
     },
   });
 
-  const deptHead = await prisma.user.upsert({
-    where: { email: "sarah.m@reelarc.com" },
-    update: {},
-    create: {
-      email: "sarah.m@reelarc.com",
-      name: "MARTINEZ, SARAH",
-      role: "DEPARTMENT_HEAD",
-      jobTitle: "Post Supervisor",
-      department: "Post Production",
-    },
-  });
-
+  // Create contractors (filmmakers)
   const josh = await prisma.user.upsert({
-    where: { email: "josh.rifkin@reelarc.com" },
+    where: { email: "josh@reelarc.com" },
     update: {},
     create: {
-      email: "josh.rifkin@reelarc.com",
+      email: "josh@reelarc.com",
       name: "RIFKIN, JOSH",
-      role: "CREW_MEMBER",
+      role: "CONTRACTOR",
       jobTitle: "Editor",
-      unionLocal: "700",
       department: "Post Production",
+      hourlyRate: 50,
+      paymentTerms: "NET_30",
+    },
+  });
+
+  const sarah = await prisma.user.upsert({
+    where: { email: "sarah@reelarc.com" },
+    update: {},
+    create: {
+      email: "sarah@reelarc.com",
+      name: "MARTINEZ, SARAH",
+      role: "CONTRACTOR",
+      jobTitle: "Colorist",
+      department: "Post Production",
+      hourlyRate: 62.5,
+      paymentTerms: "NET_45",
     },
   });
 
   const barry = await prisma.user.upsert({
-    where: { email: "barry.clint@reelarc.com" },
+    where: { email: "barry@reelarc.com" },
     update: {},
     create: {
-      email: "barry.clint@reelarc.com",
+      email: "barry@reelarc.com",
       name: "CLINT, BARRY",
-      role: "CREW_MEMBER",
-      jobTitle: "Company Grip",
-      unionLocal: "80",
-      department: "Grip",
+      role: "CONTRACTOR",
+      jobTitle: "Gaffer",
+      department: "Electric",
+      hourlyRate: 42.5,
+      paymentTerms: "NET_30",
     },
   });
 
   const aaron = await prisma.user.upsert({
-    where: { email: "aaron.wells@reelarc.com" },
+    where: { email: "aaron@reelarc.com" },
     update: {},
     create: {
-      email: "aaron.wells@reelarc.com",
+      email: "aaron@reelarc.com",
       name: "WELLS, AARON",
-      role: "CREW_MEMBER",
-      jobTitle: "Assistant Snake Wrangler",
-      department: "Animals",
+      role: "CONTRACTOR",
+      jobTitle: "Camera Operator",
+      department: "Camera",
+      hourlyRate: 52.5,
+      paymentTerms: "NET_60",
     },
   });
 
@@ -79,8 +87,8 @@ async function main() {
     },
   });
 
-  // Add members to production
-  for (const user of [admin, deptHead, josh, barry, aaron]) {
+  // Add production members
+  for (const user of [admin, josh, sarah, barry, aaron]) {
     await prisma.productionMember.upsert({
       where: {
         productionId_userId: {
@@ -95,143 +103,80 @@ async function main() {
         role: user.role,
         department: user.department,
         jobTitle: user.jobTitle,
-        rateType: user.unionLocal ? "Union/Custom" : "Flat Rate",
-        weeklyRate:
-          user.id === josh.id
-            ? 1732.5
-            : user.id === barry.id
-              ? null
-              : 1500,
-        hourlyRate:
-          user.id === josh.id
-            ? 28.875
-            : user.id === barry.id
-              ? 42.5
-              : 25,
-        guaranteedHours: user.unionLocal ? 60 : null,
+        rateType: "Hourly",
+        hourlyRate: user.hourlyRate,
+        paymentTerms: user.paymentTerms,
       },
     });
   }
 
-  // Create shoot account
-  await prisma.shootAccount.create({
-    data: {
-      productionId: production.id,
-      accountCode: "4501",
-      name: "Main Production",
-      ff1: "4599",
-    },
-  });
+  // Create scene codes
+  const sceneCodes = [
+    { code: "SC-098", description: "Ext. Parking Lot - Night", budget: 8000 },
+    { code: "SC-099", description: "Int. Hallway - Day", budget: 5000 },
+    { code: "SC-100", description: "Int. Office - Day - Dialog", budget: 12000 },
+    { code: "SC-101", description: "Int. Office - Day - Action", budget: 15000 },
+    { code: "SC-102", description: "Ext. Rooftop - Sunset", budget: 20000 },
+    { code: "SC-103", description: "Int. Warehouse - Night", budget: 10000 },
+    { code: "SC-104", description: "Ext. Street - Day - Chase", budget: 25000 },
+    { code: "SC-115", description: "Int. Kitchen - Morning", budget: 6000 },
+    { code: "SC-116", description: "Int. Bedroom - Night", budget: 4000 },
+    { code: "SC-120", description: "Ext. Beach - Golden Hour", budget: 18000 },
+  ];
+
+  for (const sc of sceneCodes) {
+    await prisma.scene.upsert({
+      where: {
+        productionId_code: {
+          productionId: production.id,
+          code: sc.code,
+        },
+      },
+      update: {},
+      create: {
+        productionId: production.id,
+        code: sc.code,
+        description: sc.description,
+        estimatedBudget: sc.budget,
+      },
+    });
+  }
 
   // Create a sample timecard for Josh
-  const weekEnding = new Date("2026-03-28");
   const timecard = await prisma.timecard.create({
     data: {
-      employeeId: josh.id,
+      contractorId: josh.id,
       productionId: production.id,
-      weekEnding,
-      status: "EMPLOYEE_COMPLETED",
-      workLocation: "CA - Glendale",
-      studio: "Studio",
+      weekEnding: new Date("2026-03-28"),
+      status: "SUBMITTED",
+      workLocation: "Studio",
       jobTitle: "Editor",
-      unionLocal: "700",
       department: "Post Production",
-      accountCode: "4501",
-      ff1: "4599",
-      weeklyRate: 1732.5,
-      hourlyRate: 28.875,
-      guaranteedHours: 60,
-      payType: "Union/Custom",
-      totalStraight: 24,
-      totalOT15: 12,
-      totalOT2: 0,
-      totalAllowances: 60,
-      totalPenalties: 0,
-      totalPay: 1099.5,
+      hourlyRate: 50,
+      paymentTerms: "NET_30",
+      totalHours: 36,
+      totalStraight: 32,
+      totalOT15: 4,
+      totalPay: 1900,
       entries: {
         create: [
-          {
-            date: new Date("2026-03-22"),
-            dayOfWeek: "Sun",
-            payType: "NOT_WORKED",
-            location: "CA",
-          },
-          {
-            date: new Date("2026-03-23"),
-            dayOfWeek: "Mon",
-            payType: "WORKED",
-            location: "CA",
-            timeIn: "06:00",
-            meal1Out: "12:00",
-            meal1In: "13:00",
-            timeOut: "19:00",
-            straightTime: 8,
-            ot15: 4,
-            totalHours: 12,
-          },
-          {
-            date: new Date("2026-03-24"),
-            dayOfWeek: "Tue",
-            payType: "WORKED",
-            location: "CA",
-            timeIn: "06:00",
-            meal1Out: "12:00",
-            meal1In: "13:00",
-            timeOut: "19:00",
-            straightTime: 8,
-            ot15: 4,
-            totalHours: 12,
-          },
-          {
-            date: new Date("2026-03-25"),
-            dayOfWeek: "Wed",
-            payType: "NOT_WORKED",
-            location: "CA",
-          },
-          {
-            date: new Date("2026-03-26"),
-            dayOfWeek: "Thu",
-            payType: "WORKED",
-            location: "CA",
-            timeIn: "06:00",
-            meal1Out: "12:00",
-            meal1In: "13:00",
-            timeOut: "19:00",
-            straightTime: 8,
-            ot15: 4,
-            totalHours: 12,
-          },
-          {
-            date: new Date("2026-03-27"),
-            dayOfWeek: "Fri",
-            payType: "NOT_WORKED",
-            location: "CA",
-          },
-          {
-            date: new Date("2026-03-28"),
-            dayOfWeek: "Sat",
-            payType: "UNPAID_DAY",
-            location: "CA",
-          },
-        ],
-      },
-      allowances: {
-        create: [
-          {
-            type: "Kit/Box Rental NT",
-            rate: 20,
-            daysWorked: 3,
-            amount: 60,
-            isTaxable: false,
-          },
+          { date: new Date("2026-03-22"), dayOfWeek: "Sun", payType: "NOT_WORKED" },
+          { date: new Date("2026-03-23"), dayOfWeek: "Mon", payType: "WORKED", timeIn: "09:00", meal1Out: "12:30", meal1In: "13:30", timeOut: "18:00", straightTime: 8, totalHours: 8 },
+          { date: new Date("2026-03-24"), dayOfWeek: "Tue", payType: "WORKED", timeIn: "09:00", meal1Out: "12:30", meal1In: "13:30", timeOut: "18:00", straightTime: 8, totalHours: 8 },
+          { date: new Date("2026-03-25"), dayOfWeek: "Wed", payType: "WORKED", timeIn: "09:00", meal1Out: "12:30", meal1In: "13:30", timeOut: "20:00", straightTime: 8, ot15: 2, totalHours: 10 },
+          { date: new Date("2026-03-26"), dayOfWeek: "Thu", payType: "WORKED", timeIn: "09:00", meal1Out: "12:30", meal1In: "13:30", timeOut: "20:00", straightTime: 8, ot15: 2, totalHours: 10 },
+          { date: new Date("2026-03-27"), dayOfWeek: "Fri", payType: "NOT_WORKED" },
+          { date: new Date("2026-03-28"), dayOfWeek: "Sat", payType: "NOT_WORKED" },
         ],
       },
     },
   });
 
   console.log("Seed completed:");
-  console.log(`  Users: ${admin.name}, ${deptHead.name}, ${josh.name}, ${barry.name}, ${aaron.name}`);
+  console.log(`  Admin: ${admin.name} (${admin.email})`);
+  console.log(`  Contractors: ${josh.name}, ${sarah.name}, ${barry.name}, ${aaron.name}`);
   console.log(`  Production: ${production.name}`);
+  console.log(`  Scenes: ${sceneCodes.length} scene codes created`);
   console.log(`  Timecard: ${timecard.id} for ${josh.name}`);
 }
 

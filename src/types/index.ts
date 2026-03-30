@@ -1,47 +1,56 @@
+// ─── Scene Types ─────────────────────────────────────
+
+export type SceneData = {
+  id: string;
+  productionId: string;
+  code: string;
+  description: string | null;
+  estimatedBudget: number | null;
+  isActive: boolean;
+};
+
+export type TimecardEntrySceneData = {
+  id: string;
+  timecardEntryId: string;
+  sceneId: string;
+  hours: number;
+  notes: string | null;
+  scene?: SceneData;
+};
+
+// ─── Timecard Types ──────────────────────────────────
+
 export type TimecardWithRelations = {
   id: string;
-  employeeId: string;
+  contractorId: string;
   productionId: string;
   weekEnding: Date | string;
   status: string;
   workLocation: string | null;
-  studio: string | null;
   jobTitle: string | null;
-  unionLocal: string | null;
   department: string | null;
-  accountCode: string | null;
-  ff1: string | null;
-  ff2: string | null;
-  series: string | null;
-  locationNote: string | null;
-  setNote: string | null;
-  weeklyRate: number | null;
   hourlyRate: number | null;
-  guaranteedHours: number | null;
-  payType: string | null;
+  dayRate: number | null;
+  paymentTerms: string;
+  totalHours: number;
   totalStraight: number;
   totalOT15: number;
   totalOT2: number;
-  totalOT25: number;
-  totalOT3: number;
-  totalForced: number;
-  totalGold: number;
   totalAllowances: number;
-  totalPenalties: number;
   totalPay: number;
-  dailyComments: string | null;
-  employeeComments: string | null;
-  employerComments: string | null;
-  payrollComments: string | null;
+  paymentDueDate: Date | string | null;
+  paidDate: Date | string | null;
+  contractorNotes: string | null;
+  adminNotes: string | null;
+  payrollNotes: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
-  employee: {
+  contractor: {
     id: string;
     name: string;
     email: string;
     role: string;
     jobTitle: string | null;
-    unionLocal: string | null;
     department: string | null;
   };
   production: {
@@ -60,24 +69,17 @@ export type TimecardEntryData = {
   date: Date | string;
   dayOfWeek: string;
   payType: string;
-  location: string | null;
   timeIn: string | null;
   meal1Out: string | null;
   meal1In: string | null;
   meal2Out: string | null;
   meal2In: string | null;
   timeOut: string | null;
-  mp1: number;
-  mp2: number;
-  mealPenalties: number;
   straightTime: number;
   ot15: number;
   ot2: number;
-  ot25: number;
-  ot3Plus: number;
-  goldTime: number;
-  forcedCall: number;
   totalHours: number;
+  scenes: TimecardEntrySceneData[];
 };
 
 export type TimecardAllowanceData = {
@@ -85,11 +87,8 @@ export type TimecardAllowanceData = {
   timecardId: string;
   type: string;
   rate: number | null;
-  daysWorked: number;
+  quantity: number;
   amount: number;
-  accountCode: string | null;
-  ff1: string | null;
-  ff2: string | null;
   isTaxable: boolean;
 };
 
@@ -99,7 +98,6 @@ export type TimecardReviewData = {
   reviewerId: string;
   action: string;
   comment: string | null;
-  tier: number;
   createdAt: Date | string;
   reviewer: {
     id: string;
@@ -108,26 +106,27 @@ export type TimecardReviewData = {
   };
 };
 
+// ─── Dashboard ───────────────────────────────────────
+
 export type DashboardTab =
-  | "todo"
-  | "open"
+  | "pending"
+  | "submitted"
   | "approved"
-  | "missing"
-  | "starts"
-  | "history"
-  | "roster";
+  | "payroll"
+  | "paid"
+  | "scenes";
+
+// ─── Constants ───────────────────────────────────────
 
 export const ALLOWANCE_TYPES = [
-  "Kit/Box Rental NT",
-  "Kit/Box Taxable",
-  "Cell Allowance",
-  "Per Diem NT",
-  "PD Taxable",
-  "Lodging NT",
-  "Lodging Taxable",
-  "Per Diem Advance",
+  "Kit Rental",
+  "Equipment Rental",
   "Mileage",
-  "Car Allowance",
+  "Per Diem",
+  "Hard Drive",
+  "Software License",
+  "Parking",
+  "Other",
 ] as const;
 
 export const PAY_TYPES = [
@@ -135,31 +134,38 @@ export const PAY_TYPES = [
   "NOT_WORKED",
   "HOLIDAY",
   "SICK",
-  "VACATION",
   "UNPAID_DAY",
   "TRAVEL",
   "PREP",
   "WRAP",
 ] as const;
 
+export const PAYMENT_TERMS_LABELS: Record<string, string> = {
+  NET_30: "Net 30",
+  NET_45: "Net 45",
+  NET_60: "Net 60",
+};
+
 export const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
-  EMPLOYEE_COMPLETED: "Employee Completed",
+  SUBMITTED: "Submitted",
   UNDER_REVIEW: "Under Review",
   APPROVED: "Approved",
   RETURNED: "Returned",
-  SUBMITTED_TO_PAYROLL: "Submitted to Payroll",
+  SUBMITTED_TO_PAYROLL: "In Payroll",
   PROCESSED: "Processed",
+  PAID: "Paid",
   VOIDED: "Voided",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
-  EMPLOYEE_COMPLETED: "bg-blue-100 text-blue-800",
+  SUBMITTED: "bg-blue-100 text-blue-800",
   UNDER_REVIEW: "bg-yellow-100 text-yellow-800",
   APPROVED: "bg-green-100 text-green-800",
   RETURNED: "bg-red-100 text-red-800",
   SUBMITTED_TO_PAYROLL: "bg-purple-100 text-purple-800",
   PROCESSED: "bg-emerald-100 text-emerald-800",
+  PAID: "bg-teal-100 text-teal-800",
   VOIDED: "bg-gray-200 text-gray-500",
 };
