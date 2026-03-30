@@ -1,0 +1,241 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  PRODUCTION_COORDINATOR
+  DEPARTMENT_HEAD
+  CREW_MEMBER
+}
+
+enum TimecardStatus {
+  DRAFT
+  EMPLOYEE_COMPLETED
+  UNDER_REVIEW
+  APPROVED
+  RETURNED
+  SUBMITTED_TO_PAYROLL
+  PROCESSED
+  VOIDED
+}
+
+enum ReviewAction {
+  REVIEWED
+  APPROVED
+  BYPASS_TO_FINAL
+  TO_REVIEW
+  RETURNED_TO_EMPLOYEE
+}
+
+enum PayType {
+  WORKED
+  NOT_WORKED
+  HOLIDAY
+  SICK
+  VACATION
+  UNPAID_DAY
+  TRAVEL
+  PREP
+  WRAP
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(CREW_MEMBER)
+  jobTitle  String?
+  unionLocal String?
+  department String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  timecards          Timecard[]
+  reviews            TimecardReview[]
+  productionMembers  ProductionMember[]
+
+  @@map("users")
+}
+
+model Production {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  timecards  Timecard[]
+  members    ProductionMember[]
+  accounts   ShootAccount[]
+
+  @@map("productions")
+}
+
+model ProductionMember {
+  id           String   @id @default(cuid())
+  productionId String
+  userId       String
+  role         UserRole
+  department   String?
+  jobTitle     String?
+  rateType     String?  // e.g. "Union/Custom", "Flat Rate", "Hourly"
+  weeklyRate   Float?
+  hourlyRate   Float?
+  guaranteedHours Float?
+  createdAt    DateTime @default(now())
+
+  production Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productionId, userId])
+  @@map("production_members")
+}
+
+model ShootAccount {
+  id           String   @id @default(cuid())
+  productionId String
+  accountCode  String
+  name         String?
+  series       String?
+  location     String?
+  set          String?
+  ff1          String?
+  ff2          String?
+
+  production Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+
+  @@map("shoot_accounts")
+}
+
+model Timecard {
+  id             String          @id @default(cuid())
+  employeeId     String
+  productionId   String
+  weekEnding     DateTime
+  status         TimecardStatus  @default(DRAFT)
+  workLocation   String?
+  studio         String?
+  jobTitle       String?
+  unionLocal     String?
+  department     String?
+  accountCode    String?
+  ff1            String?
+  ff2            String?
+  series         String?
+  locationNote   String?
+  setNote        String?
+
+  // Pay info (from production member or overridden)
+  weeklyRate     Float?
+  hourlyRate     Float?
+  guaranteedHours Float?
+  payType        String?         // "Union/Custom", "Flat Rate", etc.
+
+  // Calculated totals
+  totalStraight  Float           @default(0)
+  totalOT15      Float           @default(0)
+  totalOT2       Float           @default(0)
+  totalOT25      Float           @default(0)
+  totalOT3       Float           @default(0)
+  totalForced    Float           @default(0)
+  totalGold      Float           @default(0)
+  totalAllowances Float          @default(0)
+  totalPenalties  Float          @default(0)
+  totalPay       Float           @default(0)
+
+  // Comments
+  dailyComments    String?
+  employeeComments String?
+  employerComments String?
+  payrollComments  String?
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  employee       User            @relation(fields: [employeeId], references: [id])
+  production     Production      @relation(fields: [productionId], references: [id])
+  entries        TimecardEntry[]
+  allowances     TimecardAllowance[]
+  reviews        TimecardReview[]
+
+  @@map("timecards")
+}
+
+model TimecardEntry {
+  id          String   @id @default(cuid())
+  timecardId  String
+  date        DateTime
+  dayOfWeek   String
+  payType     PayType  @default(NOT_WORKED)
+  location    String?
+
+  // Time tracking
+  timeIn      String?
+  meal1Out    String?
+  meal1In     String?
+  meal2Out    String?
+  meal2In     String?
+  timeOut     String?
+
+  // Meal penalties
+  mp1         Float    @default(0)
+  mp2         Float    @default(0)
+  mealPenalties Float  @default(0)
+
+  // Hours breakdown
+  straightTime Float   @default(0)
+  ot15         Float   @default(0)
+  ot2          Float   @default(0)
+  ot25         Float   @default(0)
+  ot3Plus      Float   @default(0)
+  goldTime     Float   @default(0)
+  forcedCall   Float   @default(0)
+  totalHours   Float   @default(0)
+
+  timecard     Timecard @relation(fields: [timecardId], references: [id], onDelete: Cascade)
+
+  @@map("timecard_entries")
+}
+
+model TimecardAllowance {
+  id          String  @id @default(cuid())
+  timecardId  String
+  type        String  // Kit/Box Rental NT, Kit/Box Taxable, Cell Allowance, Per Diem NT, etc.
+  rate        Float?  // e.g. 20.00/D
+  daysWorked  Float   @default(0)
+  amount      Float   @default(0)
+  accountCode String?
+  ff1         String?
+  ff2         String?
+  isTaxable   Boolean @default(false)
+
+  timecard    Timecard @relation(fields: [timecardId], references: [id], onDelete: Cascade)
+
+  @@map("timecard_allowances")
+}
+
+model TimecardReview {
+  id          String       @id @default(cuid())
+  timecardId  String
+  reviewerId  String
+  action      ReviewAction
+  comment     String?
+  tier        Int          @default(1) // approval tier level
+  createdAt   DateTime     @default(now())
+
+  timecard    Timecard     @relation(fields: [timecardId], references: [id], onDelete: Cascade)
+  reviewer    User         @relation(fields: [reviewerId], references: [id])
+
+  @@map("timecard_reviews")
+}
